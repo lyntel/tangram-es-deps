@@ -7,3 +7,12 @@
 [submodule "core/deps/alfons"]
 	path = core/deps/alfons
 	url = https://github.com/hjanetzek/alfons
+[submodule "core/deps/css-color-parser-cpp"]
+	path = core/deps/css-color-parser-cpp
+	url = https://github.com/hjanetzek/css-color-parser-cpp
+[submodule "core/deps/duktape"]
+	path = core/deps/duktape
+	url = https://github.com/tangrams/duktape.git
+[submodule "core/deps/earcut"]
+	path = core/deps/earcut
+	url = https://github.com/tangrams/earcut.hpp
