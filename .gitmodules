@@ -7,12 +7,27 @@
 [submodule "core/deps/alfons"]
 	path = core/deps/alfons
 	url = https://github.com/hjanetzek/alfons
-[submodule "core/deps/css-color-parser-cpp"]
-	path = core/deps/css-color-parser-cpp
-	url = https://github.com/hjanetzek/css-color-parser-cpp
 [submodule "core/deps/duktape"]
 	path = core/deps/duktape
 	url = https://github.com/tangrams/duktape.git
 [submodule "core/deps/earcut"]
 	path = core/deps/earcut
 	url = https://github.com/tangrams/earcut.hpp
+[submodule "core/deps/yaml-cpp"]
+	path = core/deps/yaml-cpp
+	url = https://github.com/tangrams/yaml-cpp
+[submodule "core/deps/variant"]
+	path = core/deps/variant
+	url = https://github.com/tangrams/variant
+[submodule "core/deps/isect2d"]
+	path = core/deps/isect2d
+	url = https://github.com/tangrams/isect2d
+[submodule "core/deps/harfbuzz-icu-freetype"]
+	path = core/deps/harfbuzz-icu-freetype
+	url = https://github.com/tangrams/harfbuzz-icu-freetype
+[submodule "core/deps/geojson-vt-cpp"]
+	path = core/deps/geojson-vt-cpp
+	url = https://github.com/tangrams/geojson-vt-cpp
+[submodule "core/deps/SQLiteCpp"]
+	path = core/deps/SQLiteCpp
+	url = https://github.com/SRombauts/SQLiteCpp
