@@ -35,3 +35,6 @@
 [submodule "external/SQLiteCpp"]
 	path = core/deps/SQLiteCpp
 	url = https://github.com/SRombauts/SQLiteCpp.git
+[submodule "core/deps/alfonts"]
+	path = core/deps/alfonts
+	url = https://github.com/hjanetzek/alfons
