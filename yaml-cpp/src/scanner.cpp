@@ -12,43 +12,77 @@ Scanner::Scanner(std::istream& in)
       m_startedStream(false),
       m_endedStream(false),
       m_simpleKeyAllowed(false),
-      m_canBeJSONFlow(false) {}
+      m_canBeJSONFlow(false) {
+  InitTokens();
+}
+
+Scanner::Scanner(const std::string& in)
+    : INPUT(in),
+      m_startedStream(false),
+      m_endedStream(false),
+      m_simpleKeyAllowed(false),
+      m_canBeJSONFlow(false) {
+  InitTokens();
+}
 
 Scanner::~Scanner() {}
 
 bool Scanner::empty() {
   EnsureTokensInQueue();
-  return m_tokens.empty();
+  return m_tokenOut == m_tokens.end();
 }
 
 void Scanner::pop() {
-  EnsureTokensInQueue();
-  if (!m_tokens.empty())
-    m_tokens.pop();
+  if (!empty()) {
+    pop_unsafe();
+  }
 }
 
 Token& Scanner::peek() {
   EnsureTokensInQueue();
-  assert(!m_tokens.empty());  // should we be asserting here? I mean, we really
-                              // just be checking
-                              // if it's empty before peeking.
+
+  // should we be asserting here? I mean, we really
+  // just be checking if it's empty before peeking.
+  assert(m_tokenOut != m_tokens.end());
 
 #if 0
-		static Token *pLast = 0;
-		if(pLast != &m_tokens.front())
-			std::cerr << "peek: " << m_tokens.front() << "\n";
-		pLast = &m_tokens.front();
+  static Token *pLast = 0;
+  if(pLast != &m_tokens.front())
+    std::cerr << "peek: " << m_tokens.front() << "\n";
+  pLast = &m_tokens.front();
 #endif
 
-  return m_tokens.front();
+  return peek_unsafe();
+}
+
+void Scanner::CreateToken() {
+  m_tokenIn = m_tokens.emplace_after(m_tokenIn);
+}
+
+void Scanner::InitTokens() {
+  m_tokenOut = m_tokens.end();
+  for (int i = 0; i < 64; i++) {
+    m_tokens.emplace_front();
+    if (i == 0) { m_tokenIn = m_tokens.begin(); }
+  }
+
+  // auto prev = m_tokens.begin();
+  // auto it = m_tokens.begin();
+  // ++it;
+  // for (; it != m_tokens.end(); it++) {
+  //   printf("%li ", (std::ptrdiff_t(&(*it)) - std::ptrdiff_t(&(*prev))));
+  //   prev = it;
+  // }
+  // printf("\n -- %lu / %lu\n", sizeof(Token), alignof(Token));
 }
 
 Mark Scanner::mark() const { return INPUT.mark(); }
 
 void Scanner::EnsureTokensInQueue() {
   while (1) {
-    if (!m_tokens.empty()) {
-      Token& token = m_tokens.front();
+    if (m_tokenOut != m_tokens.end()) {
+      Token& token = *m_tokenOut;
+      m_tokenPtr = &token;
 
       // if this guy's valid, then we're done
       if (token.status == Token::VALID) {
@@ -57,7 +91,7 @@ void Scanner::EnsureTokensInQueue() {
 
       // here's where we clean up the impossible tokens
       if (token.status == Token::INVALID) {
-        m_tokens.pop();
+        pop_unsafe();
         continue;
       }
 
@@ -72,6 +106,8 @@ void Scanner::EnsureTokensInQueue() {
     // no? then scan...
     ScanNextToken();
   }
+
+  m_tokenPtr = nullptr;
 }
 
 void Scanner::ScanNextToken() {
@@ -97,103 +133,108 @@ void Scanner::ScanNextToken() {
   if (!INPUT) {
     return EndStream();
   }
-
-  if (INPUT.column() == 0 && INPUT.peek() == Keys::Directive) {
-    return ScanDirective();
-  }
-
-  // document token
-  if (INPUT.column() == 0 && Exp::DocStart().Matches(INPUT)) {
-    return ScanDocStart();
-  }
-
-  if (INPUT.column() == 0 && Exp::DocEnd().Matches(INPUT)) {
-    return ScanDocEnd();
-  }
+  char c = INPUT.peek();
 
   // flow start/end/entry
-  if (INPUT.peek() == Keys::FlowSeqStart ||
-      INPUT.peek() == Keys::FlowMapStart) {
+  if (c == Keys::FlowSeqStart ||
+      c == Keys::FlowMapStart) {
     return ScanFlowStart();
-  }
 
-  if (INPUT.peek() == Keys::FlowSeqEnd || INPUT.peek() == Keys::FlowMapEnd) {
+  } else if (c == Keys::FlowSeqEnd ||
+      c == Keys::FlowMapEnd) {
     return ScanFlowEnd();
-  }
 
-  if (INPUT.peek() == Keys::FlowEntry) {
+  } else if (c == Keys::FlowEntry) {
     return ScanFlowEntry();
   }
 
+  if (INPUT.column() == 0) {
+    if (c == Keys::Directive) {
+      return ScanDirective();
+    }
+
+    // document token
+    if (Exp::DocStart::Matches(INPUT)) {
+        return ScanDocStart();
+    }
+
+    if (Exp::DocEnd::Matches(INPUT)) {
+        return ScanDocEnd();
+    }
+  }
+
+  // Get large enough lookahead buffer for all Matchers
+  Exp::Source<4> input;
+  INPUT.LookaheadBuffer(input);
   // block/map stuff
-  if (Exp::BlockEntry().Matches(INPUT)) {
-    return ScanBlockEntry();
-  }
+  if (Exp::BlockEntry::Matches(input)) {
+    ScanBlockEntry();
 
-  if ((InBlockContext() ? Exp::Key() : Exp::KeyInFlow()).Matches(INPUT)) {
-    return ScanKey();
-  }
+  } else if (InBlockContext() ?
+      // TODO these are the same?
+      Exp::Key::Matches(input) :
+      Exp::KeyInFlow::Matches(input)) {
+    ScanKey();
 
-  if (GetValueRegex().Matches(INPUT)) {
-    return ScanValue();
-  }
+  } else if (InBlockContext() && Exp::Value::Matches(input)) {
+    ScanValue();
 
-  // alias/anchor
-  if (INPUT.peek() == Keys::Alias || INPUT.peek() == Keys::Anchor) {
-    return ScanAnchorOrAlias();
-  }
+  } else if (m_canBeJSONFlow && Exp::ValueInJSONFlow::Matches(input)) {
+    ScanValue();
 
-  // tag
-  if (INPUT.peek() == Keys::Tag) {
-    return ScanTag();
-  }
+  } else if (!m_canBeJSONFlow && Exp::ValueInFlow::Matches(input)) {
+    ScanValue();
 
-  // special scalars
-  if (InBlockContext() && (INPUT.peek() == Keys::LiteralScalar ||
-                           INPUT.peek() == Keys::FoldedScalar)) {
-    return ScanBlockScalar();
-  }
+  }  else if (c == Keys::Alias || c == Keys::Anchor) {
+    ScanAnchorOrAlias();
 
-  if (INPUT.peek() == '\'' || INPUT.peek() == '\"') {
-    return ScanQuotedScalar();
-  }
+  } else if (c == Keys::Tag) {
+    ScanTag();
 
-  // plain scalars
-  if ((InBlockContext() ? Exp::PlainScalar() : Exp::PlainScalarInFlow())
-          .Matches(INPUT)) {
-    return ScanPlainScalar();
-  }
+  } else if (InBlockContext() && (c == Keys::LiteralScalar ||
+                                  c == Keys::FoldedScalar)) {
+    // special scalars
+    ScanBlockScalar();
 
-  // don't know what it is!
-  throw ParserException(INPUT.mark(), ErrorMsg::UNKNOWN_TOKEN);
+  } else if  (c == '\'' || c == '\"') {
+    ScanQuotedScalar();
+
+  } else if (Exp::PlainScalarCommon::Matches(input) &&
+             ((InBlockContext() && Exp::PlainScalar::Matches(input)) ||
+              (InFlowContext() && Exp::PlainScalarInFlow::Matches(input)))) {
+
+    ScanPlainScalar();
+
+  } else {
+    // don't know what it is!
+    throw ParserException(INPUT.mark(), ErrorMsg::UNKNOWN_TOKEN);
+  }
 }
 
 void Scanner::ScanToNextToken() {
   while (1) {
+    INPUT.EatSpace();
+
     // first eat whitespace
     while (INPUT && IsWhitespaceToBeEaten(INPUT.peek())) {
-      if (InBlockContext() && Exp::Tab().Matches(INPUT)) {
+      if (InBlockContext() && Exp::Tab::Matches(INPUT)) {
         m_simpleKeyAllowed = false;
       }
-      INPUT.eat(1);
+      INPUT.eat();
     }
 
     // then eat a comment
-    if (Exp::Comment().Matches(INPUT)) {
+    if (Exp::Comment::Matches(INPUT)) {
       // eat until line break
-      while (INPUT && !Exp::Break().Matches(INPUT)) {
-        INPUT.eat(1);
-      }
+      INPUT.EatToEndOfLine();
     }
 
     // if it's NOT a line break, then we're done!
-    if (!Exp::Break().Matches(INPUT)) {
-      break;
-    }
-
     // otherwise, let's eat the line break and keep going
-    int n = Exp::Break().Match(INPUT);
-    INPUT.eat(n);
+    if (!(INPUT.peek() == '\n' || INPUT.peek() == '\r') ||
+        !INPUT.EatLineBreak()) {
+        break;
+    }
 
     // oh yeah, and let's get rid of that simple key
     InvalidateSimpleKey();
@@ -229,20 +270,12 @@ bool Scanner::IsWhitespaceToBeEaten(char ch) {
   return false;
 }
 
-const RegEx& Scanner::GetValueRegex() const {
-  if (InBlockContext()) {
-    return Exp::Value();
-  }
-
-  return m_canBeJSONFlow ? Exp::ValueInJSONFlow() : Exp::ValueInFlow();
-}
 
 void Scanner::StartStream() {
   m_startedStream = true;
   m_simpleKeyAllowed = true;
-  std::unique_ptr<IndentMarker> pIndent(
-      new IndentMarker(-1, IndentMarker::NONE));
-  m_indentRefs.push_back(std::move(pIndent));
+
+  m_indentRefs.emplace_back(-1, IndentMarker::NONE);
   m_indents.push(&m_indentRefs.back());
 }
 
@@ -257,11 +290,6 @@ void Scanner::EndStream() {
 
   m_simpleKeyAllowed = false;
   m_endedStream = true;
-}
-
-Token* Scanner::PushToken(Token::TYPE type) {
-  m_tokens.push(Token(type, INPUT.mark()));
-  return &m_tokens.back();
 }
 
 Token::TYPE Scanner::GetStartTokenFor(IndentMarker::INDENT_TYPE type) const {
@@ -282,29 +310,32 @@ Scanner::IndentMarker* Scanner::PushIndentTo(int column,
                                              IndentMarker::INDENT_TYPE type) {
   // are we in flow?
   if (InFlowContext()) {
-    return 0;
+    return nullptr;
   }
 
-  std::unique_ptr<IndentMarker> pIndent(new IndentMarker(column, type));
-  IndentMarker& indent = *pIndent;
   const IndentMarker& lastIndent = *m_indents.top();
 
   // is this actually an indentation?
-  if (indent.column < lastIndent.column) {
-    return 0;
+  if (column < lastIndent.column) {
+    return nullptr;
   }
-  if (indent.column == lastIndent.column &&
-      !(indent.type == IndentMarker::SEQ &&
+  if (column == lastIndent.column &&
+      !(type == IndentMarker::SEQ &&
         lastIndent.type == IndentMarker::MAP)) {
-    return 0;
+    return nullptr;
   }
 
+  m_indentRefs.emplace_back(column, type);
+  IndentMarker& indent = m_indentRefs.back();
+
   // push a start token
-  indent.pStartToken = PushToken(GetStartTokenFor(type));
+  auto& token = push();
+  token.type = GetStartTokenFor(type);
+  token.mark = INPUT.mark();
+  indent.pStartToken = &token;
 
   // and then the indent
   m_indents.push(&indent);
-  m_indentRefs.push_back(std::move(pIndent));
   return &m_indentRefs.back();
 }
 
@@ -322,7 +353,7 @@ void Scanner::PopIndentToHere() {
     }
     if (indent.column == INPUT.column() &&
         !(indent.type == IndentMarker::SEQ &&
-          !Exp::BlockEntry().Matches(INPUT))) {
+          !Exp::BlockEntry::Matches(INPUT))) {
       break;
     }
 
@@ -361,24 +392,20 @@ void Scanner::PopIndent() {
     return;
   }
 
-  if (indent.type == IndentMarker::SEQ) {
-    m_tokens.push(Token(Token::BLOCK_SEQ_END, INPUT.mark()));
-  } else if (indent.type == IndentMarker::MAP) {
-    m_tokens.push(Token(Token::BLOCK_MAP_END, INPUT.mark()));
-  }
-}
+  auto& token = push();
+  token.mark = INPUT.mark();
 
-int Scanner::GetTopIndent() const {
-  if (m_indents.empty()) {
-    return 0;
+  if (indent.type == IndentMarker::SEQ) {
+    token.type = Token::BLOCK_SEQ_END;
+  } else if (indent.type == IndentMarker::MAP) {
+    token.type = Token::BLOCK_MAP_END;
   }
-  return m_indents.top()->column;
 }
 
 void Scanner::ThrowParserException(const std::string& msg) const {
   Mark mark = Mark::null_mark();
-  if (!m_tokens.empty()) {
-    const Token& token = m_tokens.front();
+  if (m_tokenOut != m_tokens.end()) {
+    const Token& token = *m_tokenOut;
     mark = token.mark;
   }
   throw ParserException(mark, msg);

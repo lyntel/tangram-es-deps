@@ -5,9 +5,9 @@
 #include <typeinfo>
 #include <utility>
 
-#include <boost/timer/timer.hpp>
+#include "auto_cpu_timer.hpp"
 
-#include "variant.hpp"
+#include <mapbox/variant.hpp>
 
 using namespace mapbox;
 
@@ -19,24 +19,24 @@ struct sub;
 template <typename OpTag>
 struct binary_op;
 
-typedef util::variant<int ,
+typedef util::variant<int,
                       util::recursive_wrapper<binary_op<add>>,
-                      util::recursive_wrapper<binary_op<sub>>
-                      > expression;
+                      util::recursive_wrapper<binary_op<sub>>>
+    expression;
 
 template <typename Op>
 struct binary_op
 {
-    expression left;  // variant instantiated here...
+    expression left; // variant instantiated here...
     expression right;
 
-    binary_op(expression && lhs, expression && rhs)
+    binary_op(expression&& lhs, expression&& rhs)
         : left(std::move(lhs)), right(std::move(rhs))
     {
     }
 };
 
-struct print : util::static_visitor<void>
+struct print
 {
     template <typename T>
     void operator()(T const& val) const
@@ -45,8 +45,7 @@ struct print : util::static_visitor<void>
     }
 };
 
-
-struct test : util::static_visitor<std::string>
+struct test
 {
     template <typename T>
     std::string operator()(T const& obj) const
@@ -55,10 +54,9 @@ struct test : util::static_visitor<std::string>
     }
 };
 
-struct calculator : public util::static_visitor<int>
+struct calculator
 {
-public:
-
+  public:
     int operator()(int value) const
     {
         return value;
@@ -66,21 +64,18 @@ public:
 
     int operator()(binary_op<add> const& binary) const
     {
-        return util::apply_visitor(calculator(), binary.left)
-            + util::apply_visitor(calculator(), binary.right);
+        return util::apply_visitor(calculator(), binary.left) + util::apply_visitor(calculator(), binary.right);
     }
 
     int operator()(binary_op<sub> const& binary) const
     {
-        return util::apply_visitor(calculator(), binary.left)
-            - util::apply_visitor(calculator(), binary.right);
+        return util::apply_visitor(calculator(), binary.left) - util::apply_visitor(calculator(), binary.right);
     }
 };
 
-struct to_string : public util::static_visitor<std::string>
+struct to_string
 {
-public:
-
+  public:
     std::string operator()(int value) const
     {
         return std::to_string(value);
@@ -88,16 +83,13 @@ public:
 
     std::string operator()(binary_op<add> const& binary) const
     {
-        return util::apply_visitor(to_string(), binary.left) + std::string("+")
-            + util::apply_visitor(to_string(), binary.right);
+        return util::apply_visitor(to_string(), binary.left) + std::string("+") + util::apply_visitor(to_string(), binary.right);
     }
 
     std::string operator()(binary_op<sub> const& binary) const
     {
-        return util::apply_visitor(to_string(), binary.left) + std::string("-")
-            + util::apply_visitor(to_string(), binary.right);
+        return util::apply_visitor(to_string(), binary.left) + std::string("-") + util::apply_visitor(to_string(), binary.right);
     }
-
 };
 
 } // namespace test
@@ -119,7 +111,7 @@ int main(int argc, char** argv)
 
     int total = 0;
     {
-        boost::timer::auto_cpu_timer t;
+        auto_cpu_timer t;
         for (std::size_t i = 0; i < NUM_ITER; ++i)
         {
             total += util::apply_visitor(test::calculator(), result);

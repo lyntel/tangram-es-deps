@@ -1,0 +1,22 @@
+language: cpp
+
+sudo: false
+
+env:
+  matrix:
+    - MASON_TEST="unit"
+    - MASON_TEST="c_install"
+    - MASON_TEST="c_build"
+    - MASON_TEST="c_install_symlink_includes"
+    - MASON_TEST="cpp11_header_install"
+    - MASON_TEST="cpp11_install"
+    - MASON_TEST="cpp11_build"
+    - MASON_TEST="c_build_android"
+
+install:
+# NOTE: must be absolute path for predictable behavior
+# when packages call out to mason themselves in order to install deps
+- export MASON_DIR=$(pwd)
+
+script:
+- ./test/${MASON_TEST}.sh

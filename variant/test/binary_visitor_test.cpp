@@ -9,15 +9,17 @@
 #include <utility>
 #include <vector>
 
-#include "variant.hpp"
-#include "variant_io.hpp"
+#include <mapbox/variant.hpp>
+#include <mapbox/variant_io.hpp>
 
 using namespace mapbox;
 
 namespace test {
 
 template <typename T>
-struct string_to_number {};
+struct string_to_number
+{
+};
 
 template <>
 struct string_to_number<double>
@@ -57,7 +59,7 @@ struct string_to_number<bool>
     }
 };
 
-struct javascript_equal_visitor : util::static_visitor<bool>
+struct javascript_equal_visitor
 {
     template <typename T>
     bool operator()(T lhs, T rhs) const
@@ -108,7 +110,6 @@ int main()
 
     std::cerr << v0 << " == " << v1 << " -> "
               << std::boolalpha << util::apply_visitor(test::javascript_equal_visitor(), v0, v1) << std::endl;
-
 
     std::vector<variant_type> vec;
 

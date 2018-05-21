@@ -1,11 +1,4 @@
-#ifndef SINGLEDOCPARSER_H_62B23520_7C8E_11DE_8A39_0800200C9A66
-#define SINGLEDOCPARSER_H_62B23520_7C8E_11DE_8A39_0800200C9A66
-
-#if defined(_MSC_VER) ||                                            \
-    (defined(__GNUC__) && (__GNUC__ == 3 && __GNUC_MINOR__ >= 4) || \
-     (__GNUC__ >= 4))  // GCC supports "pragma once" correctly since 3.4
 #pragma once
-#endif
 
 #include <map>
 #include <memory>
@@ -32,18 +25,17 @@ class SingleDocParser : private noncopyable {
 
  private:
   void HandleNode(EventHandler& eventHandler);
+  Token::TYPE HandleNodeOpen(EventHandler& eventHandler);
 
-  void HandleSequence(EventHandler& eventHandler);
   void HandleBlockSequence(EventHandler& eventHandler);
   void HandleFlowSequence(EventHandler& eventHandler);
 
-  void HandleMap(EventHandler& eventHandler);
   void HandleBlockMap(EventHandler& eventHandler);
   void HandleFlowMap(EventHandler& eventHandler);
   void HandleCompactMap(EventHandler& eventHandler);
   void HandleCompactMapWithNoKey(EventHandler& eventHandler);
 
-  void ParseProperties(std::string& tag, anchor_t& anchor);
+  bool ParseProperties(std::string& tag, anchor_t& anchor);
   void ParseTag(std::string& tag);
   void ParseAnchor(anchor_t& anchor);
 
@@ -61,5 +53,3 @@ class SingleDocParser : private noncopyable {
   anchor_t m_curAnchor;
 };
 }
-
-#endif  // SINGLEDOCPARSER_H_62B23520_7C8E_11DE_8A39_0800200C9A66

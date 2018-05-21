@@ -1,4 +1,3 @@
-
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -8,10 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include <boost/variant.hpp>
-#include <boost/timer/timer.hpp>
+#include "auto_cpu_timer.hpp"
 
-#include "variant.hpp"
+#include <boost/variant.hpp>
+#include <mapbox/variant.hpp>
 
 #define TEXT_SHORT "Test"
 #define TEXT_LONG "Testing various variant implementations with a longish string ........................................."
@@ -29,7 +28,7 @@ struct Holder
     std::vector<value_type> data;
 
     template <typename T>
-    void append_move(T && obj)
+    void append_move(T&& obj)
     {
         data.emplace_back(std::forward<T>(obj));
     }
@@ -43,7 +42,7 @@ struct Holder
 
 } // namespace test
 
-struct print : util::static_visitor<>
+struct print
 {
     template <typename T>
     void operator()(T const& val) const
@@ -52,33 +51,32 @@ struct print : util::static_visitor<>
     }
 };
 
-
 template <typename V>
 struct dummy : boost::static_visitor<>
 {
-    dummy(V & v)
+    dummy(V& v)
         : v_(v) {}
 
     template <typename T>
-    void operator()(T && val) const
+    void operator()(T&& val) const
     {
         v_ = std::move(val);
     }
-    V & v_;
+    V& v_;
 };
 
 template <typename V>
-struct dummy2 : util::static_visitor<>
+struct dummy2
 {
-    dummy2(V & v)
+    dummy2(V& v)
         : v_(v) {}
 
     template <typename T>
-    void operator()(T && val) const
+    void operator()(T&& val) const
     {
         v_ = std::move(val);
     }
-    V & v_;
+    V& v_;
 };
 
 void run_boost_test(std::size_t runs)
@@ -141,12 +139,12 @@ int main(int argc, char** argv)
 
         {
             std::cerr << "custom variant: ";
-            boost::timer::auto_cpu_timer t;
+            auto_cpu_timer t;
             run_variant_test(NUM_RUNS);
         }
         {
             std::cerr << "boost variant: ";
-            boost::timer::auto_cpu_timer t;
+            auto_cpu_timer t;
             run_boost_test(NUM_RUNS);
         }
     }
@@ -159,12 +157,12 @@ int main(int argc, char** argv)
             typedef thread_group::value_type value_type;
             thread_group tg;
             std::cerr << "custom variant: ";
-            boost::timer::auto_cpu_timer timer;
+            auto_cpu_timer timer;
             for (std::size_t i = 0; i < THREADS; ++i)
             {
                 tg.emplace_back(new std::thread(run_variant_test, NUM_RUNS));
             }
-            std::for_each(tg.begin(), tg.end(), [](value_type & t) {if (t->joinable()) t->join();});
+            std::for_each(tg.begin(), tg.end(), [](value_type& t) {if (t->joinable()) t->join(); });
         }
 
         {
@@ -172,16 +170,15 @@ int main(int argc, char** argv)
             typedef thread_group::value_type value_type;
             thread_group tg;
             std::cerr << "boost variant: ";
-            boost::timer::auto_cpu_timer timer;
+            auto_cpu_timer timer;
             for (std::size_t i = 0; i < THREADS; ++i)
             {
                 tg.emplace_back(new std::thread(run_boost_test, NUM_RUNS));
             }
-            std::for_each(tg.begin(), tg.end(), [](value_type & t) {if (t->joinable()) t->join();});
+            std::for_each(tg.begin(), tg.end(), [](value_type& t) {if (t->joinable()) t->join(); });
         }
     }
 #endif
-
 
     return EXIT_SUCCESS;
 }
