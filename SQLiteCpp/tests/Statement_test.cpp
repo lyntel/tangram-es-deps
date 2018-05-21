@@ -3,7 +3,7 @@
  * @ingroup tests
  * @brief   Test of a SQLiteCpp Statement.
  *
- * Copyright (c) 2012-2018 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2016 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -19,7 +19,6 @@
 #include <cstdio>
 #include <stdint.h>
 
-#include <climits> // For INT_MAX
 
 TEST(Statement, invalid) {
     // Create a new database
@@ -321,12 +320,10 @@ TEST(Statement, bindings) {
     // reset() without clearbindings()
     insert.reset();
 
-    // Sixth row with uint32_t unsigned value and a long value (which is either a 32b int or a 64b long long)
+    // Sixth row with uint32_t unsigned value
     {
         const uint32_t  uint32 = 4294967295U;
-        const long      integer = -123;
         insert.bind(2, uint32);
-        insert.bind(3, integer);
         EXPECT_EQ(1, insert.exec());
         EXPECT_EQ(SQLITE_DONE, db.getErrorCode());
 
@@ -336,7 +333,6 @@ TEST(Statement, bindings) {
         EXPECT_FALSE(query.isDone());
         EXPECT_EQ(6, query.getColumn(0).getInt64());
         EXPECT_EQ(4294967295U, query.getColumn(2).getUInt());
-        EXPECT_EQ(-123, query.getColumn(3).getInt());
     }
 }
 
@@ -385,16 +381,15 @@ TEST(Statement, bindByName) {
     EXPECT_EQ(SQLite::OK, db.getErrorCode());
 
     // Create a new table
-    EXPECT_EQ(0, db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, msg TEXT, int INTEGER, double REAL, long INTEGER)"));
+    EXPECT_EQ(0, db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, msg TEXT, int INTEGER, double REAL)"));
     EXPECT_EQ(SQLite::OK, db.getErrorCode());
 
     // Insertion with bindable parameters
-    SQLite::Statement insert(db, "INSERT INTO test VALUES (NULL, @msg, @int, @double, @long)");
+    SQLite::Statement insert(db, "INSERT INTO test VALUES (NULL, @msg, @int, @double)");
 
     // First row with text/int/double
     insert.bind("@msg",      "first");
     insert.bind("@int",      123);
-    insert.bind("@long",      -123);
     insert.bind("@double",   0.123);
     EXPECT_EQ(1, insert.exec());
     EXPECT_EQ(SQLITE_DONE, db.getErrorCode());
@@ -402,7 +397,7 @@ TEST(Statement, bindByName) {
     // Compile a SQL query to check the result
     SQLite::Statement query(db, "SELECT * FROM test");
     EXPECT_STREQ("SELECT * FROM test", query.getQuery().c_str());
-    EXPECT_EQ(5, query.getColumnCount());
+    EXPECT_EQ(4, query.getColumnCount());
 
     // Check the result
     query.executeStep();
@@ -412,7 +407,6 @@ TEST(Statement, bindByName) {
     EXPECT_STREQ("first",   query.getColumn(1).getText());
     EXPECT_EQ   (123,       query.getColumn(2).getInt());
     EXPECT_EQ   (0.123,     query.getColumn(3).getDouble());
-    EXPECT_EQ   (-123,      query.getColumn(4).getInt());
 
     // reset() with clearbindings() and new bindings
     insert.reset();
@@ -422,12 +416,10 @@ TEST(Statement, bindByName) {
     {
         const std::string   second("second");
         const long long     int64 = 12345678900000LL;
-        const long          integer = -123;
         const float         float32 = 0.234f;
         insert.bind("@msg",      second);
         insert.bind("@int",      int64);
         insert.bind("@double",   float32);
-        insert.bind("@long",     integer);
         EXPECT_EQ(1, insert.exec());
         EXPECT_EQ(SQLITE_DONE, db.getErrorCode());
 
@@ -439,7 +431,6 @@ TEST(Statement, bindByName) {
         EXPECT_EQ(second,           query.getColumn(1).getText());
         EXPECT_EQ(12345678900000LL, query.getColumn(2).getInt64());
         EXPECT_EQ(0.234f,           query.getColumn(3).getDouble());
-        EXPECT_EQ(-123,             query.getColumn(4).getInt());
     }
 
     // reset() without clearbindings()
@@ -752,7 +743,7 @@ TEST(Statement, getColumns) {
     EXPECT_EQ("first", testStruct.msg);
     EXPECT_EQ(123, testStruct.integer);
     EXPECT_EQ(0.123, testStruct.real);
-
+    
     // Get only the first 2 columns
     auto testStruct2 = query.getColumns<GetRowTestStruct, 2>();
     EXPECT_EQ(1, testStruct2.id);
@@ -762,16 +753,3 @@ TEST(Statement, getColumns) {
 }
 #endif
 
-#if (LONG_MAX > INT_MAX) // sizeof(long)==8 means the data model of the system is LLP64 (64bits Linux)
-TEST(Statement, bind64bitsLong) {
-    // Create a new database
-    SQLite::Database db(":memory:", SQLite::OPEN_READWRITE|SQLite::OPEN_CREATE);
-    EXPECT_EQ(SQLite::OK, db.getErrorCode());
-    EXPECT_EQ(SQLite::OK, db.getExtendedErrorCode());
-
-    SQLite::Statement query(db, "SELECT ?");
-    query.bind(1, 4294967297L);
-    query.executeStep();
-    EXPECT_EQ(4294967297L, query.getColumn(0).getInt64());
-}
-#endif

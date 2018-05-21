@@ -3,7 +3,7 @@
  * @ingroup SQLiteCpp
  * @brief   Management of a SQLite Database Connection.
  *
- * Copyright (c) 2012-2018 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2016 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -11,7 +11,6 @@
 #pragma once
 
 #include <SQLiteCpp/Column.h>
-#include <SQLiteCpp/Utils.h>    // definition of nullptr for C++98/C++03 compilers
 
 #include <string.h>
 
@@ -96,7 +95,7 @@ public:
     Database(const char* apFilename,
              const int   aFlags         = SQLite::OPEN_READONLY,
              const int   aBusyTimeoutMs = 0,
-             const char* apVfs          = nullptr);
+             const char* apVfs          = NULL);
 
     /**
      * @brief Open the provided database UTF-8 filename.
@@ -310,10 +309,10 @@ public:
      * @param[in] aNbArg        Number of arguments in the function
      * @param[in] abDeterministic Optimize for deterministic functions (most are). A random number generator is not.
      * @param[in] apApp         Arbitrary pointer of user data, accessible with sqlite3_user_data().
-     * @param[in] apFunc        Pointer to a C-function to implement a scalar SQL function (apStep & apFinal nullptr)
-     * @param[in] apStep        Pointer to a C-function to implement an aggregate SQL function (apFunc nullptr)
-     * @param[in] apFinal       Pointer to a C-function to implement an aggregate SQL function (apFunc nullptr)
-     * @param[in] apDestroy     If not nullptr, then it is the destructor for the application data pointer.
+     * @param[in] apFunc        Pointer to a C-function to implement a scalar SQL function (apStep & apFinal NULL)
+     * @param[in] apStep        Pointer to a C-function to implement an aggregate SQL function (apFunc NULL)
+     * @param[in] apFinal       Pointer to a C-function to implement an aggregate SQL function (apFunc NULL)
+     * @param[in] apDestroy     If not NULL, then it is the destructor for the application data pointer.
      *
      * @throw SQLite::Exception in case of error
      */
@@ -338,10 +337,10 @@ public:
      * @param[in] aNbArg        Number of arguments in the function
      * @param[in] abDeterministic Optimize for deterministic functions (most are). A random number generator is not.
      * @param[in] apApp         Arbitrary pointer of user data, accessible with sqlite3_user_data().
-     * @param[in] apFunc        Pointer to a C-function to implement a scalar SQL function (apStep & apFinal nullptr)
-     * @param[in] apStep        Pointer to a C-function to implement an aggregate SQL function (apFunc nullptr)
-     * @param[in] apFinal       Pointer to a C-function to implement an aggregate SQL function (apFunc nullptr)
-     * @param[in] apDestroy     If not nullptr, then it is the destructor for the application data pointer.
+     * @param[in] apFunc        Pointer to a C-function to implement a scalar SQL function (apStep & apFinal NULL)
+     * @param[in] apStep        Pointer to a C-function to implement an aggregate SQL function (apFunc NULL)
+     * @param[in] apFinal       Pointer to a C-function to implement an aggregate SQL function (apFunc NULL)
+     * @param[in] apDestroy     If not NULL, then it is the destructor for the application data pointer.
      *
      * @throw SQLite::Exception in case of error
      */
@@ -369,7 +368,7 @@ public:
      * @note UTF-8 text encoding assumed.
      *
      * @param[in] apExtensionName   Name of the shared library containing extension
-     * @param[in] apEntryPointName  Name of the entry point (nullptr to let sqlite work it out)
+     * @param[in] apEntryPointName  Name of the entry point (NULL to let sqlite work it out)
      *
      * @throw SQLite::Exception in case of error
      */

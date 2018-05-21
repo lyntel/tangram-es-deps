@@ -3,7 +3,7 @@
  * @ingroup SQLiteCpp
  * @brief   A prepared SQLite Statement is a compiled SQL query ready to be executed, pointing to a row of result.
  *
- * Copyright (c) 2012-2018 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2016 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -14,7 +14,6 @@
 
 #include <string>
 #include <map>
-#include <climits> // For INT_MAX
 
 // Forward declarations to avoid inclusion of <sqlite3.h> in a header
 struct sqlite3;
@@ -115,25 +114,6 @@ public:
      * @brief Bind a 32bits unsigned int value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
      */
     void bind(const int aIndex, const unsigned      aValue);
-
-#if (LONG_MAX == INT_MAX) // sizeof(long)==4 means the data model of the system is ILP32 (32bits OS or Windows 64bits)
-    /**
-     * @brief Bind a 32bits long value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
-     */
-    void bind(const int aIndex, const long          aValue)
-    {
-        bind(aIndex, static_cast<int>(aValue));
-    }
-#else // sizeof(long)==8 means the data model of the system is LLP64 (64bits Linux)
-    /**
-     * @brief Bind a 64bits long value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
-     */
-    void bind(const int aIndex, const long          aValue)
-    {
-        bind(aIndex, static_cast<long long>(aValue));
-    }
-#endif
-
     /**
      * @brief Bind a 64bits int value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
      */
@@ -197,24 +177,6 @@ public:
      * @brief Bind a 32bits unsigned int value to a named parameter "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
      */
     void bind(const char* apName, const unsigned        aValue);
-
-#if (LONG_MAX == INT_MAX) // sizeof(long)==4 means the data model of the system is ILP32 (32bits OS or Windows 64bits)
-    /**
-     * @brief Bind a 32bits long value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
-     */
-    void bind(const char* apName, const long           aValue)
-    {
-        bind(apName, static_cast<int>(aValue));
-    }
-#else // sizeof(long)==8 means the data model of the system is LLP64 (64bits Linux)
-    /**
-     * @brief Bind a 64bits long value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
-     */
-    void bind(const char* apName, const long           aValue)
-    {
-        bind(apName, static_cast<long long>(aValue));
-    }
-#endif
     /**
      * @brief Bind a 64bits int value to a named parameter "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
      */
@@ -285,24 +247,6 @@ public:
     {
         bind(aName.c_str(), aValue);
     }
-
-#if (LONG_MAX == INT_MAX) // sizeof(long)==4 means the data model of the system is ILP32 (32bits OS or Windows 64bits)
-    /**
-     * @brief Bind a 32bits long value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
-     */
-    void bind(const std::string& aName, const long                  aValue)
-    {
-        bind(aName.c_str(), static_cast<int>(aValue));
-    }
-#else // sizeof(long)==8 means the data model of the system is LLP64 (64bits Linux)
-    /**
-     * @brief Bind a 64bits long value to a parameter "?", "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
-     */
-    void bind(const std::string& aName, const long                   aValue)
-    {
-        bind(aName.c_str(), static_cast<long long>(aValue));
-    }
-#endif
     /**
      * @brief Bind a 64bits int value to a named parameter "?NNN", ":VVV", "@VVV" or "$VVV" in the SQL prepared statement (aIndex >= 1)
      */
@@ -409,7 +353,7 @@ public:
     /**
      * @brief Try to execute a step of the prepared query to fetch one row of results, returning the sqlite result code.
      *
-     *
+     *  
      *
      * @see exec() execute a one-step prepared statement with no expected result
      * @see executeStep() execute a step of the prepared query to fetch one row of results

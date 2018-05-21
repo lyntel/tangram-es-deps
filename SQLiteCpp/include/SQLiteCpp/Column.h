@@ -3,7 +3,7 @@
  * @ingroup SQLiteCpp
  * @brief   Encapsulation of a Column in a row of the result pointed by the prepared SQLite::Statement.
  *
- * Copyright (c) 2012-2018 Sebastien Rombauts (sebastien.rombauts@gmail.com)
+ * Copyright (c) 2012-2016 Sebastien Rombauts (sebastien.rombauts@gmail.com)
  *
  * Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
  * or copy at http://opensource.org/licenses/MIT)
@@ -14,7 +14,7 @@
 #include <SQLiteCpp/Exception.h>
 
 #include <string>
-#include <climits> // For INT_MAX
+#include <limits.h>
 
 
 namespace SQLite
@@ -76,7 +76,7 @@ public:
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
     /**
      * @brief Return a pointer to the table column name that is the origin of this result column
-     *
+     * 
      *  Require definition of the SQLITE_ENABLE_COLUMN_METADATA preprocessor macro :
      * - when building the SQLite library itself (which is the case for the Debian libsqlite3 binary for instance),
      * - and also when compiling this wrapper.
@@ -187,7 +187,7 @@ public:
     {
         return getUInt();
     }
-#else // sizeof(long)==8 means the data model of the system is LLP64 (64bits Linux)
+#else
     /// Inline cast operator to 64bits long when the data model of the system is ILP64 (Linux 64 bits...)
     inline operator long() const
     {

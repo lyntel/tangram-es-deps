@@ -3,6 +3,10 @@
 
 #include "fixtures/geometries.hpp"
 
+#if _MSC_VER >= 1900
+#pragma comment(lib, "legacy_stdio_definitions.lib")
+#endif
+
 #include <GLFW/glfw3.h>
 
 #include <cstdlib>
@@ -18,67 +22,90 @@ static bool drawFill = true;
 static bool drawMesh = true;
 static bool dirty = true;
 
+static float scale = 1.0f;
+static float posX = 0;
+static float posY = 0;
+static float prevX = 0;
+static float prevY = 0;
+static bool mDown = false;
+
 static int shapeIndex = 0;
-const static int totalShapes = 12;
+const static int totalShapes = 27;
 
 static int tesselator = 0;
 const static int totalTesselators = 2;
 const static std::array<std::string, totalTesselators> tesselatorNames = {{ "earcut", "libtess2" }};
 
+template <typename T>
 struct Shape {
-    Shape(std::vector<std::array<int, 2>> vertices_, std::vector<uint32_t> indices_)
+    Shape(std::vector<std::array<T, 2>> vertices_, std::vector<uint32_t> indices_)
         : vertices(std::move(vertices_)), indices(std::move(indices_)) {
-        auto minX = std::numeric_limits<int>::max();
-        auto maxX = std::numeric_limits<int>::min();
-        auto minY = std::numeric_limits<int>::max();
-        auto maxY = std::numeric_limits<int>::min();
-        for (const auto &pt : vertices) {
+        auto minX = std::numeric_limits<T>::max();
+        auto maxX = std::numeric_limits<T>::min();
+        auto minY = std::numeric_limits<T>::max();
+        auto maxY = std::numeric_limits<T>::min();
+        for (const auto &i : indices) {
+            auto& pt = vertices[i];
             if (pt[0] < minX) minX = pt[0];
             if (pt[1] < minY) minY = pt[1];
             if (pt[0] > maxX) maxX = pt[0];
             if (pt[1] > maxY) maxY = pt[1];
         }
 
-        const auto dimX = maxX - minX;
-        const auto dimY = maxY - minY;
-        midX = minX + dimX / 2;
-        midY = minY + dimY / 2;
-        ext = 1.10 * std::max(dimX, dimY) / 2;
+        const auto dimX = minX < maxX ? maxX - minX : 0;
+        const auto dimY = minY < maxY ? maxY - minY : 0;
+
+        midX = static_cast<int>(minX + dimX / 2);
+        midY = static_cast<int>(minY + dimY / 2);
+        ext = static_cast<int>(1.10 * (std::max)(dimX, dimY) / 2);
     }
 
-    const std::vector<std::array<int, 2>> vertices;
+    const std::vector<std::array<T, 2>> vertices;
     const std::vector<uint32_t> indices;
     int midX, midY, ext;
 };
 
-template <typename Polygon>
-auto buildPolygon(const Polygon &polygon) -> const Shape {
+template <typename Coord, typename Polygon>
+Shape<Coord> buildPolygon(const Polygon &polygon) {
     if (tesselator == 0) {
-        EarcutTesselator<int, Polygon> tess(polygon);
+        EarcutTesselator<Coord, Polygon> tess(polygon);
         tess.run();
-        return Shape(std::move(tess.vertices()), std::move(tess.indices()));
+        return Shape<Coord>(std::move(tess.vertices()), std::move(tess.indices()));
     } else if (tesselator == 1) {
-        Libtess2Tesselator<int, Polygon> tess(polygon);
+        Libtess2Tesselator<Coord, Polygon> tess(polygon);
         tess.run();
-        return Shape(std::move(tess.vertices()), std::move(tess.indices()));
+        return Shape<Coord>(std::move(tess.vertices()), std::move(tess.indices()));
     }
     assert(false);
-    return Shape(std::vector<std::array<int, 2>>(), std::vector<uint32_t>());
+    return Shape<Coord>(std::vector<std::array<Coord, 2>>(), std::vector<uint32_t>());
 }
 
 template <typename Polygon>
 void drawPolygon(const char *name, const Polygon &polygon) {
     glfwSetWindowTitle(window, (tesselatorNames[tesselator] + ": " + name).c_str());
 
-    const auto shape = buildPolygon(polygon);
+    using Coord = typename Polygon::value_type::value_type::first_type;
+    const auto shape = buildPolygon<Coord>(polygon);
 
     glViewport(0, 0, fbWidth, fbHeight);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(shape.midX - shape.ext, shape.midX + shape.ext, shape.midY + shape.ext, shape.midY - shape.ext, 0, 1);
+    glOrtho((shape.midX - shape.ext),
+            (shape.midX + shape.ext),
+            (shape.midY + shape.ext),
+            (shape.midY - shape.ext),
+            0, 1);
+
     glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glTranslatef(shape.midX, shape.midY, 0);
+    glScalef(scale, scale, 1);
+
+    glTranslatef(-shape.midX + posX * shape.ext/fbWidth, -shape.midY + posY * shape.ext/fbWidth, 0);
 
     glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     const auto &v = shape.vertices;
     const auto &x = shape.indices;
@@ -86,9 +113,18 @@ void drawPolygon(const char *name, const Polygon &polygon) {
     // Draw triangle fill
     if (drawFill) {
         glBegin(GL_TRIANGLES);
-        glColor3f(0.3f, 0.3f, 0.3f);
-        for (const auto pt : x) {
-            glVertex2f(v[pt][0], v[pt][1]);
+        glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+        int nTri = x.size()/3;
+        float step = 1.0f/nTri;
+        float c = 0;
+
+        for (int i = 0; i < x.size(); i+=3) {
+            glColor4f(c, 0, 1-c, 0.5f);
+            c += step;
+            glVertex2f(static_cast<GLfloat>(v[x[i+0]][0]), static_cast<GLfloat>(v[x[i+0]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i+1]][0]), static_cast<GLfloat>(v[x[i+1]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i+2]][0]), static_cast<GLfloat>(v[x[i+2]][1]));
+
         }
         glEnd();
     }
@@ -97,17 +133,29 @@ void drawPolygon(const char *name, const Polygon &polygon) {
     if (drawMesh) {
         glLineWidth(float(fbWidth) / width);
         glBegin(GL_LINES);
-        glColor3f(1, 0, 0);
+        glColor4f(1, 0, 0, 0.2);
         for (size_t i = 0; i < x.size(); i += 3) {
-            glVertex2f(v[x[i]][0], v[x[i]][1]);
-            glVertex2f(v[x[i + 1]][0], v[x[i + 1]][1]);
-            glVertex2f(v[x[i + 1]][0], v[x[i + 1]][1]);
-            glVertex2f(v[x[i + 2]][0], v[x[i + 2]][1]);
-            glVertex2f(v[x[i + 2]][0], v[x[i + 2]][1]);
-            glVertex2f(v[x[i]][0], v[x[i]][1]);
+            glVertex2f(static_cast<GLfloat>(v[x[i]][0]), static_cast<GLfloat>(v[x[i]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i + 1]][0]), static_cast<GLfloat>(v[x[i + 1]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i + 1]][0]), static_cast<GLfloat>(v[x[i + 1]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i + 2]][0]), static_cast<GLfloat>(v[x[i + 2]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i + 2]][0]), static_cast<GLfloat>(v[x[i + 2]][1]));
+            glVertex2f(static_cast<GLfloat>(v[x[i]][0]), static_cast<GLfloat>(v[x[i]][1]));
         }
         glEnd();
     }
+
+    for (auto& ring : polygon) {
+        glBegin(GL_LINE_LOOP);
+        glColor4f(0, 0, 0, 0.4);
+
+        for (auto& p : ring) {
+            glVertex2f(static_cast<GLfloat>(p.first), static_cast<GLfloat>(p.second));
+        }
+        glEnd();
+
+    }
+
 }
 
 
@@ -152,6 +200,31 @@ int main() {
             dirty = true;
         }
     });
+    glfwSetScrollCallback(window, [](GLFWwindow* window, double scrollx, double scrolly) {
+        scale *= scrolly < 0 ? 0.75 : 1.25;
+        dirty = true;
+
+      });
+    glfwSetCursorPosCallback(window, [](GLFWwindow* window, double x, double y){
+        int action = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1);
+
+        if (action == GLFW_PRESS) {
+          if (!mDown) {
+            mDown = true;
+            prevX = x;
+            prevY = y;
+            return;
+          }
+
+          posX += (x - prevX) / (scale/2);
+          posY += (y - prevY) / (scale/2);
+          prevX = x;
+          prevY = y;
+          dirty = true;
+        } else {
+          mDown = false;
+        }
+      });
 
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow * /*win*/, int w, int h) {
         fbWidth = w;
@@ -169,18 +242,33 @@ int main() {
 
         if (dirty) {
             switch (shapeIndex) {
-                case 0: drawPolygon("bad_hole", mapbox::fixtures::bad_hole); break;
-                case 1: drawPolygon("building", mapbox::fixtures::building); break;
-                case 2: drawPolygon("degenerate", mapbox::fixtures::degenerate); break;
-                case 3: drawPolygon("dude", mapbox::fixtures::dude); break;
-                case 4: drawPolygon("empty_square", mapbox::fixtures::empty_square); break;
-                case 5: drawPolygon("water_huge", mapbox::fixtures::water_huge); break;
-                case 6: drawPolygon("water_huge2", mapbox::fixtures::water_huge2); break;
-                case 7: drawPolygon("water", mapbox::fixtures::water); break;
-                case 8: drawPolygon("water2", mapbox::fixtures::water2); break;
-                case 9: drawPolygon("water3", mapbox::fixtures::water3); break;
-                case 10: drawPolygon("water3b", mapbox::fixtures::water3b); break;
-                case 11: drawPolygon("water4", mapbox::fixtures::water4); break;
+                case 0: drawPolygon("building", mapbox::fixtures::building); break;
+                case 1: drawPolygon("dude", mapbox::fixtures::dude); break;
+                case 2: drawPolygon("water", mapbox::fixtures::water); break;
+                case 3: drawPolygon("water2", mapbox::fixtures::water2); break;
+                case 4: drawPolygon("water3", mapbox::fixtures::water3); break;
+                case 5: drawPolygon("water3b", mapbox::fixtures::water3b); break;
+                case 6: drawPolygon("water4", mapbox::fixtures::water4); break;
+                case 7: drawPolygon("water_huge", mapbox::fixtures::water_huge); break;
+                case 8: drawPolygon("water_huge2", mapbox::fixtures::water_huge2); break;
+                case 9: drawPolygon("degenerate", mapbox::fixtures::degenerate); break;
+                case 10: drawPolygon("bad_hole", mapbox::fixtures::bad_hole); break;
+                case 11: drawPolygon("empty_square", mapbox::fixtures::empty_square); break;
+                case 12: drawPolygon("issue16", mapbox::fixtures::issue16); break;
+                case 13: drawPolygon("issue17", mapbox::fixtures::issue17); break;
+                case 14: drawPolygon("steiner", mapbox::fixtures::steiner); break;
+                case 15: drawPolygon("issue29", mapbox::fixtures::issue29); break;
+                case 16: drawPolygon("issue34", mapbox::fixtures::issue34); break;
+                case 17: drawPolygon("issue35", mapbox::fixtures::issue35); break;
+                case 18: drawPolygon("self-touching", mapbox::fixtures::self_touching); break;
+                case 19: drawPolygon("outside-ring", mapbox::fixtures::outside_ring); break;
+                case 20: drawPolygon("simplified-us-border", mapbox::fixtures::simplified_us_border); break;
+                case 21: drawPolygon("touching-holes", mapbox::fixtures::touching_holes); break;
+                case 22: drawPolygon("hole-touching-outer", mapbox::fixtures::hole_touching_outer); break;
+                case 23: drawPolygon("hilbert", mapbox::fixtures::hilbert); break;
+                case 24: drawPolygon("issue45", mapbox::fixtures::issue45); break;
+                case 25: drawPolygon("park", mapbox::fixtures::park); break;
+                case 26: drawPolygon("eberly-6", mapbox::fixtures::eberly_6); break;
                 default: assert(false); break;
             }
 
